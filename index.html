@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lenia — Continuous Cellular Automata</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0c;
+    color: #d4d0c8;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #12121a;
+    border-bottom: 1px solid #2a2a3a;
+    z-index: 10;
+  }
+  #header h1 {
+    font-size: 14px;
+    font-weight: 400;
+    color: #c49a6c;
+    letter-spacing: 2px;
+  }
+  #header .stats {
+    font-size: 11px;
+    color: #666;
+  }
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  canvas {
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+  #panel {
+    width: 260px;
+    background: #12121a;
+    border-left: 1px solid #2a2a3a;
+    padding: 12px;
+    overflow-y: auto;
+    font-size: 12px;
+  }
+  .group { margin-bottom: 14px; }
+  .group-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  .param {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .param label {
+    width: 70px;
+    color: #888;
+    font-size: 11px;
+  }
+  .param input[type="range"] {
+    flex: 1;
+    accent-color: #c49a6c;
+    height: 3px;
+  }
+  .param .val {
+    width: 44px;
+    text-align: right;
+    color: #c49a6c;
+    font-size: 11px;
+  }
+  .btn-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  button {
+    flex: 1;
+    padding: 5px 8px;
+    background: #1a1a2a;
+    color: #d4d0c8;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  button:hover { background: #2a2a3a; }
+  button.active { background: #2a1a0a; border-color: #c49a6c; color: #c49a6c; }
+  select {
+    width: 100%;
+    padding: 5px 8px;
+    background: #1a1a2a;
+    color: #d4d0c8;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+  }
+  .info {
+    font-size: 10px;
+    color: #555;
+    line-height: 1.5;
+    margin-top: 10px;
+    border-top: 1px solid #2a2a3a;
+    padding-top: 10px;
+  }
+  a { color: #c49a6c; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🪶 LENIA</h1>
+  <div class="stats">
+    <span id="fps">0 fps</span> ·
+    <span id="step">step 0</span> ·
+    <span id="pop">pop 0</span>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap"><canvas id="c"></canvas></div>
+  <div id="panel">
+    <div class="btn-row">
+      <button id="bPlay" class="active">▶ Play</button>
+      <button id="bPause">⏸ Pause</button>
+      <button id="bStep">⏭ Step</button>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Preset</div>
+      <select id="preset">
+        <option value="orbium">Orbium</option>
+        <option value="geminium">Geminium</option>
+        <option value="scutium">Scutium</option>
+        <option value="hydrogeminium">Hydrogeminium</option>
+        <option value="random">Random Soup</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Kernel Ring</div>
+      <div class="param"><label>R</label>
+        <input type="range" id="R" min="4" max="20" step="1" value="13">
+        <span class="val" id="R-v">13</span></div>
+      <div class="param"><label>β₁ (ring)</label>
+        <input type="range" id="b1" min="0.1" max="0.9" step="0.01" value="0.50">
+        <span class="val" id="b1-v">0.50</span></div>
+      <div class="param"><label>β₂ (width)</label>
+        <input type="range" id="b2" min="0.02" max="0.3" step="0.01" value="0.15">
+        <span class="val" id="b2-v">0.15</span></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Growth</div>
+      <div class="param"><label>μ grow</label>
+        <input type="range" id="mg" min="0.01" max="0.4" step="0.005" value="0.150">
+        <span class="val" id="mg-v">0.150</span></div>
+      <div class="param"><label>σ grow</label>
+        <input type="range" id="sg" min="0.003" max="0.08" step="0.001" value="0.015">
+        <span class="val" id="sg-v">0.015</span></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Dynamics</div>
+      <div class="param"><label>dt</label>
+        <input type="range" id="dt" min="0.02" max="0.5" step="0.01" value="0.10">
+        <span class="val" id="dt-v">0.10</span></div>
+      <div class="param"><label>Steps/frame</label>
+        <input type="range" id="spf" min="1" max="8" step="1" value="2">
+        <span class="val" id="spf-v">2</span></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">Brush</div>
+      <div class="param"><label>Radius</label>
+        <input type="range" id="br" min="1" max="25" step="1" value="6">
+        <span class="val" id="br-v">6</span></div>
+    </div>
+
+    <div class="info">
+      <b>Lenia</b> — continuous cellular automata<br>
+      by Bert Wang-Chak Chan<br><br>
+      Click canvas to inject matter.<br>
+      Self-maintaining boundaries emerge<br>
+      from smooth continuous dynamics —<br>
+      a concrete example of Varela's<br>
+      autopoiesis in silico.<br><br>
+      <a href="https://arxiv.org/abs/2005.03742">arXiv:2005.03742</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Lenia — Continuous Cellular Automata
+// Kestrel's implementation · April 2026
+//
+// A visual study in emergent self-boundaries.
+// The kernel K(r) is a Gaussian ring; the growth function G(n)
+// is a Gaussian bump. Self-maintaining organisms emerge when
+// K and G conspire to create stable boundary conditions.
+// ============================================================
+
+const SZ = 200; // grid resolution (performance-sensitive)
+let N = SZ;
+
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+cv.width = N; cv.height = N;
+
+let A = new Float32Array(N * N); // current state
+let B = new Float32Array(N * N); // next state
+let img = cx.createImageData(N, N);
+
+// Kernel: pre-computed sparse list of { dy, dx, w }
+let kernOffsets = [];
+let kernDirty = true;
+
+// Colormap: build a 256-entry LUT for fast rendering
+const LUT_R = new Uint8Array(256);
+const LUT_G = new Uint8Array(256);
+const LUT_B = new Uint8Array(256);
+
+function buildLUT() {
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255;
+    if (v < 0.01) {
+      LUT_R[i] = 10; LUT_G[i] = 10; LUT_B[i] = 14;
+    } else {
+      // Warm copper-amber palette (matches Kestrel's aesthetic)
+      LUT_R[i] = Math.min(255, Math.floor(30 + v * 225));
+      LUT_G[i] = Math.min(255, Math.floor(v < 0.3 ? v / 0.3 * 100 : v < 0.7 ? 100 + (v - 0.3) / 0.4 * 70 : 170 + (v - 0.7) / 0.3 * 60));
+      LUT_B[i] = Math.min(255, Math.floor(v < 0.4 ? v / 0.4 * 35 : 35 + (v - 0.4) / 0.6 * 30));
+    }
+  }
+}
+buildLUT();
+
+function val(id) { return parseFloat(document.getElementById(id).value); }
+
+function rebuildKernel() {
+  const R = Math.round(val('R'));
+  const b1 = val('b1');
+  const b2 = val('b2');
+  kernOffsets = [];
+  let sum = 0;
+
+  // First pass: compute weights and sum
+  const tmp = [];
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      const d = Math.sqrt(dy * dy + dx * dx) / R;
+      if (d > 1.0) continue;
+      // Ring kernel: Gaussian peaked at r = b1 with width b2
+      const w = Math.exp(-((d - b1) ** 2) / (2 * b2 * b2));
+      if (w < 0.001) continue; // skip negligible weights
+      tmp.push({ dy, dx, w });
+      sum += w;
+    }
+  }
+
+  // Normalize so weights sum to 1
+  for (const t of tmp) {
+    kernOffsets.push({ dy: t.dy, dx: t.dx, w: t.w / sum });
+  }
+  kernDirty = false;
+}
+
+function simStep() {
+  if (kernDirty) rebuildKernel();
+
+  const mg = val('mg');
+  const sg = val('sg');
+  const dt = val('dt');
+  const inv2sg2 = 1 / (2 * sg * sg);
+
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let conv = 0;
+      for (let k = 0; k < kernOffsets.length; k++) {
+        const o = kernOffsets[k];
+        const ny = (y + o.dy + N) % N;
+        const nx = (x + o.dx + N) % N;
+        conv += A[ny * N + nx] * o.w;
+      }
+      // Growth: Gaussian bump
+      const g = 2 * Math.exp(-((conv - mg) ** 2) * inv2sg2) - 1;
+      B[y * N + x] = Math.max(0, Math.min(1, A[y * N + x] + dt * g));
+    }
+  }
+  [A, B] = [B, A];
+}
+
+function render() {
+  const d = img.data;
+  let pop = 0;
+  for (let i = 0, j = 0; i < N * N; i++, j += 4) {
+    const idx = Math.min(255, Math.max(0, (A[i] * 255) | 0));
+    if (idx > 2) pop++;
+    d[j]     = LUT_R[idx];
+    d[j + 1] = LUT_G[idx];
+    d[j + 2] = LUT_B[idx];
+    d[j + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+
+  // Scale canvas to fit
+  const wrap = document.getElementById('canvas-wrap');
+  const sz = Math.min(wrap.clientWidth - 20, wrap.clientHeight - 20);
+  cv.style.width = sz + 'px';
+  cv.style.height = sz + 'px';
+
+  document.getElementById('pop').textContent = 'pop ' + pop;
+}
+
+function applyParams(p) {
+  for (const [k, v] of Object.entries(p)) {
+    const el = document.getElementById(k);
+    if (el) el.value = v;
+  }
+  kernDirty = true;
+  updateVals();
+}
+
+function updateVals() {
+  for (const id of ['R', 'b1', 'b2', 'mg', 'sg', 'dt', 'spf', 'br']) {
+    const el = document.getElementById(id);
+    const v = document.getElementById(id + '-v');
+    if (el && v) v.textContent = parseFloat(el.value).toFixed(el.step && el.step < 0.1 ? 3 : 2);
+  }
+}
+
+const PRESETS = {
+  orbium:        { R: 13, b1: 0.50, b2: 0.15, mg: 0.150, sg: 0.015, dt: 0.10 },
+  geminium:      { R: 13, b1: 0.50, b2: 0.15, mg: 0.150, sg: 0.015, dt: 0.10 },
+  scutium:       { R: 10, b1: 0.38, b2: 0.18, mg: 0.180, sg: 0.020, dt: 0.12 },
+  hydrogeminium: { R: 15, b1: 0.42, b2: 0.12, mg: 0.130, sg: 0.012, dt: 0.08 },
+};
+
+function initPreset(name) {
+  A.fill(0);
+  const cxp = N / 2, cyp = N / 2;
+
+  if (name === 'random') {
+    for (let i = 0; i < N * N; i++) {
+      A[i] = Math.random() < 0.15 ? Math.random() * 0.7 : 0;
+    }
+    // Apply random-ish params
+    applyParams({ R: 13, b1: 0.5, b2: 0.15, mg: 0.15, sg: 0.015, dt: 0.1 });
+    return;
+  }
+
+  applyParams(PRESETS[name] || PRESETS.orbium);
+
+  // Seed shapes
+  const r = name === 'scutium' ? { rx: 12, ry: 6 } :
+            name === 'hydrogeminium' ? { rx: 5, ry: 5 } :
+            { rx: 8, ry: 8 };
+
+  const offsets = name === 'geminium' || name === 'hydrogeminium'
+    ? [{ x: -5, y: 0 }, { x: 5, y: 0 }]
+    : [{ x: 0, y: 0 }];
+
+  for (const off of offsets) {
+    for (let y = cyp - r.ry - 2; y <= cyp + r.ry + 2; y++) {
+      for (let x = cxp + off.x - r.rx - 2; x <= cxp + off.x + r.rx + 2; x++) {
+        const dx = (x - cxp - off.x) / r.rx;
+        const dy = (y - cyp - off.y) / r.ry;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 1) {
+          A[((y + N) % N) * N + ((x + N) % N)] = Math.max(0, 1 - d2);
+        }
+      }
+    }
+  }
+}
+
+// Brush
+let painting = false;
+function paint(ex, ey) {
+  const radius = Math.round(val('br'));
+  const sx = N / cv.clientWidth;
+  const sy = N / cv.clientHeight;
+  const gx = Math.floor(ex * sx);
+  const gy = Math.floor(ey * sy);
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > radius) continue;
+      const x = (gx + dx + N) % N;
+      const y = (gy + dy + N) % N;
+      A[y * N + x] = Math.min(1, A[y * N + x] + Math.max(0, 1 - d / radius));
+    }
+  }
+}
+
+cv.addEventListener('mousedown', e => { painting = true; paint(e.offsetX, e.offsetY); });
+cv.addEventListener('mousemove', e => { if (painting) paint(e.offsetX, e.offsetY); });
+cv.addEventListener('mouseup', () => painting = false);
+cv.addEventListener('mouseleave', () => painting = false);
+
+// Touch support
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  painting = true;
+  const t = e.touches[0];
+  const rect = cv.getBoundingClientRect();
+  paint(t.clientX - rect.left, t.clientY - rect.top);
+});
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = cv.getBoundingClientRect();
+  paint(t.clientX - rect.left, t.clientY - rect.top);
+});
+cv.addEventListener('touchend', () => painting = false);
+
+// Controls
+let running = true;
+let stepN = 0;
+
+document.getElementById('bPlay').addEventListener('click', function() {
+  running = true; this.classList.add('active');
+  document.getElementById('bPause').classList.remove('active');
+});
+document.getElementById('bPause').addEventListener('click', function() {
+  running = false; this.classList.add('active');
+  document.getElementById('bPlay').classList.remove('active');
+});
+document.getElementById('bStep').addEventListener('click', () => { simStep(); render(); stepN++; });
+document.getElementById('preset').addEventListener('change', function() {
+  initPreset(this.value); stepN = 0; render();
+});
+document.querySelectorAll('input[type="range"]').forEach(el => {
+  el.addEventListener('input', () => {
+    kernDirty = true;
+    updateVals();
+  });
+});
+
+// FPS tracking
+let fCount = 0, fTime = performance.now();
+
+function loop() {
+  if (running) {
+    const spf = Math.round(val('spf'));
+    for (let i = 0; i < spf; i++) {
+      simStep();
+      stepN++;
+    }
+    render();
+  }
+
+  fCount++;
+  const now = performance.now();
+  if (now - fTime >= 1000) {
+    document.getElementById('fps').textContent = fCount + ' fps';
+    document.getElementById('step').textContent = 'step ' + stepN;
+    fCount = 0;
+    fTime = now;
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// Boot
+initPreset('orbium');
+updateVals();
+render();
+loop();
+</script>
+</body>
+</html>
